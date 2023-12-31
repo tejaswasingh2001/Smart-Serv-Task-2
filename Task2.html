@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            background-color: #f2f2f2;
+            flex-direction: column;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+        }
+
+        .half-div {
+            flex: 1;
+            box-sizing: border-box;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .full-div {
+            flex: 1;
+            box-sizing: border-box;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            margin-right: 20px;
+            margin-left: 20px;
+        }
+
+        #fileInput,
+        #formatDropdown,
+        #encodingDropdown,
+        #delimiterDropdown,
+        #hasHeaderCheckbox {
+            margin-bottom: 20px;
+        }
+
+        #columnSelector {
+            width: 200px;
+        }
+
+        #selectedColumnsTable {
+            flex: 1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="half-div" style="margin-right: 10px;">
+            <h2>1. File Upload</h2>
+            <input type="file" id="fileInput" accept=".csv, .json" onchange="uploadFile()" />
+            <p style="font-size: 14px;">Supported File Type(s): .CSV, .JSON</p>
+            <br>
+            <div id="fileInfo"></div>
+        </div>
+
+        <div class="half-div" style="margin-left: 10px">
+            <h2>2. Specify Format</h2>
+            <label for="formatDropdown">File Format:</label>
+            <select id="formatDropdown">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+
+            <br>
+            <br>
+
+            <label for="encodingDropdown">Character Encoding:</label>
+            <select id="encodingDropdown">
+                <option value="utf-8">UTF-8</option>
+                <option value="utf-16">UTF-16</option>
+            </select>
+
+            <br>
+            <br>
+
+            <label for="delimiterDropdown">Delimiter:</label>
+            <select id="delimiterDropdown">
+                <option value=",">Comma (,)</option>
+                <option value=";">Semicolon (;)</option>
+                <option value="\t">Tab (\t)</option>
+            </select>
+
+            <br>
+            <br>
+
+            <input type="checkbox" id="hasHeaderCheckbox" />
+            <label for="hasHeaderCheckbox">File has header</label>
+        </div>
+    </div>
+
+    <div class="full-div">
+        <h2>3. Display Handling</h2>
+        <div id="columnSelector" style="text-transform: capitalize">
+            <!-- Dynamic column checkboxes will be added here -->
+        </div>
+
+        <div id="selectedColumnsTable" style="text-transform: capitalize">
+            <!-- Dynamic table will be added here -->
+        </div>
+    </div>
+
+    <script>
+        var displayedRows = 10;
+
+        function uploadFile() {
+            var fileInput = document.getElementById('fileInput');
+            var fileInfo = document.getElementById('fileInfo');
+
+            var fileType = document.getElementById('formatDropdown').options[document.getElementById('formatDropdown').selectedIndex].value;
+            var encodingType = document.getElementById('encodingDropdown').options[document.getElementById('encodingDropdown').selectedIndex].value;
+
+            // console.log(fileType)
+
+            var file = fileInput.files[0];
+            // console.log(fileInput.files[0].type.split('/')[1])
+
+            // console.log(fileInput.files[0])
+
+            if (fileType != fileInput.files[0].type.split('/')[1]) {
+                return alert('Select correct file format, refresh and then choose the file again.')
+            }
+
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        var fileContent = e.target.result;
+                        if (file.type === 'application/json') {
+                            var jsonData = JSON.parse(fileContent);
+                            populateColumnSelector(jsonData);
+                            displaySelectedColumns(jsonData);
+                        } else if (file.type === 'text/csv') {
+                            handleCSVData(fileContent);
+                        }
+                    } catch (error) {
+                        console.error('Error reading file:', error);
+                    }
+                };
+
+                if (file.type === 'application/json') {
+                    reader.readAsText(file);
+                } else if (file.type === 'text/csv') {
+                    reader.readAsText(file, encodingType);
+                }
+                fileInfo.innerHTML = '<strong>File Info:</strong><br>';
+                fileInfo.innerHTML += 'Name: ' + file.name + '<br>';
+                fileInfo.innerHTML += 'Size: ' + file.size + ' bytes<br>';
+                fileInfo.innerHTML += 'Type: ' + file.type;
+            }
+            else {
+                fileInfo.innerHTML = 'Please select a file.';
+            }
+        }
+
+        function populateColumnSelector(jsonData) {
+            var columnSelector = document.getElementById('columnSelector');
+            columnSelector.innerHTML = '<h2>Select Columns</h2>';
+
+            var columns = Object.keys(jsonData.products[Object.keys(jsonData.products)[0]]);
+
+            columns.forEach(function (column) {
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'checkbox_' + column;
+                checkbox.value = column;
+                checkbox.checked = true;
+
+                var label = document.createElement('label');
+                label.htmlFor = 'checkbox_' + column;
+                label.appendChild(document.createTextNode(column));
+
+                columnSelector.appendChild(checkbox);
+                columnSelector.appendChild(label);
+                columnSelector.appendChild(document.createElement('br'));
+
+                checkbox.addEventListener('change', function () {
+                    displaySelectedColumns(jsonData);
+                });
+            });
+        }
+
+        function capitalizeFirstLetter(string) {
+            return string
+            .split(/[\s-]+/)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+        }
+
+        function displaySelectedColumns(jsonData) {
+            var selectedColumnsTable = document.getElementById('selectedColumnsTable');
+            selectedColumnsTable.innerHTML = '<h2>Selected Columns</h2>';
+
+            var columnSelector = document.getElementById('columnSelector');
+            var checkboxes = columnSelector.querySelectorAll('input[type="checkbox"]');
+
+            if (!jsonData || Object.keys(jsonData.products).length === 0) {
+                selectedColumnsTable.innerHTML += 'No product data available.';
+                return;
+            }
+
+            var sortedData = Object.keys(jsonData.products).sort(function (a, b) {
+                return jsonData.products[b].popularity - jsonData.products[a].popularity;
+            });
+
+            var table = document.createElement('table');
+            var headerRow = table.insertRow(0);
+
+            checkboxes.forEach(function (checkbox) {
+                var columnName = checkbox.value;
+                var headerCell = headerRow.insertCell();
+                headerCell.innerHTML = columnName;
+                headerCell.style.display = checkbox.checked ? 'table-cell' : 'none';
+            });
+
+            // Example: Add data rows (limit to 10 rows)
+            var rowCount = 0;
+            sortedData.forEach(function (productId) {
+                // if (rowCount >= displayedRows) return; // Stop adding rows after the limit
+                var productData = jsonData.products[productId];
+                var row = table.insertRow();
+
+                checkboxes.forEach(function (checkbox) {
+                    var columnName = checkbox.value;
+                    var cellValue = productData[columnName];
+                    var cell = row.insertCell();
+                    cell.innerHTML = columnName === 'subcategory' ? capitalizeFirstLetter(cellValue) : cellValue;
+                    cell.style.display = checkbox.checked ? 'table-cell' : 'none';
+                });
+
+                rowCount++;
+            });
+
+            selectedColumnsTable.appendChild(table);
+        }
+
+        function handleCSVData(csvContent) {
+            var rows = csvContent.trim().split('\n');
+            var delimiterType = document.getElementById('delimiterDropdown').options[document.getElementById('delimiterDropdown').selectedIndex].value;
+            var columns = rows[0].split(delimiterType);
+
+            var columnSelector = document.getElementById('columnSelector');
+            columnSelector.innerHTML = '<h2>Select Columns</h2>';
+
+            columns.forEach(function (column) {
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'checkbox_' + column;
+                checkbox.value = column;
+                checkbox.checked = true;
+
+                var label = document.createElement('label');
+                label.htmlFor = 'checkbox_' + column;
+                label.appendChild(document.createTextNode(column));
+
+                columnSelector.appendChild(checkbox);
+                columnSelector.appendChild(label);
+                columnSelector.appendChild(document.createElement('br'));
+
+                checkbox.addEventListener('change', function () {
+                    displaySelectedColumns(columns, rows);
+                });
+            });
+
+            displaySelectedColumnsCSV(columns, rows);
+        }
+
+        function displaySelectedColumnsCSV(columns, rows) {
+            var selectedColumnsTable = document.getElementById('selectedColumnsTable');
+            selectedColumnsTable.innerHTML = '<h2>Selected Columns</h2>';
+
+            var columnSelector = document.getElementById('columnSelector');
+            var checkboxes = columnSelector.querySelectorAll('input[type="checkbox"]');
+
+            var table = document.createElement('table');
+            var headerRow = table.insertRow(0);
+
+            checkboxes.forEach(function (checkbox) {
+                var columnName = checkbox.value;
+                var headerCell = headerRow.insertCell();
+                headerCell.innerHTML = columnName;
+                headerCell.style.display = checkbox.checked ? 'table-cell' : 'none';
+            });
+
+            for (var i = 1; i < 11 && i < rows.length; i++) {
+                var rowData = rows[i].split(',');
+                var row = table.insertRow();
+
+                checkboxes.forEach(function (checkbox) {
+                    var columnName = checkbox.value;
+                    var columnIndex = columns.indexOf(columnName);
+                    if (columnIndex !== -1) {
+                        var cellValue = rowData[columnIndex];
+                        var cell = row.insertCell();
+                        cell.innerHTML = cellValue;
+                        cell.style.display = checkbox.checked ? 'table-cell' : 'none';
+                    }
+                });
+            }
+
+            selectedColumnsTable.appendChild(table);
+        }
+    </script>
+</body>
+</html>
